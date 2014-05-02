@@ -13,4 +13,10 @@
   <class name="edm::AssociationMap<edm::OneToMany<std::vector<reco::GenJet>, std::vector<reco::GenParticle>,unsigned int> >" >
     <field name="transientMap_" transient="true" />
   </class>
+  <class name="vallot::GenTTbbCandidate" />
+  <class name="std::vector<vallot::GenTTbbCandidate>" />
+  <class name="edm::Wrapper<vallot::GenTTbbCandidate>"/>
+  <class name="edm::Wrapper<std::vector<vallot::GenTTbbCandidate> >"/>
+  <class name="edm::Ptr<vallot::GenTTbbCandidate>"/>
+
 </lcgdict>

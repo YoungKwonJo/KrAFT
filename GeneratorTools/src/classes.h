@@ -6,6 +6,10 @@
 //#include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "KrAFT/GeneratorTools/interface/Types.h"
 
+#include "DataFormats/Common/interface/Wrapper.h"
+#include "KrAFT/GeneratorTools/interface/GenTTbbCandidate.h"
+#include <vector>
+
 namespace pat {
   edm::RefProd<std::vector<pat::Jet> > dummy00;
 
@@ -21,3 +25,16 @@ namespace reco {
   edm::Wrapper<edm::AssociationMap<edm::OneToMany<std::vector<reco::GenJet>,std::vector<reco::GenParticle>,unsigned int> > > dummy12;
 
 }
+namespace {
+  struct KrAFT_GenericNtuple {
+
+    vallot::GenTTbbCandidate dummyGenTTbbCandidate;
+    edm::Wrapper<vallot::GenTTbbCandidate> dummyGenTTbbCandidateWrapper;
+    std::vector<vallot::GenTTbbCandidate> dummyGenTTbbCandidateCollection;
+    edm::Wrapper<std::vector<vallot::GenTTbbCandidate> > dummyGenTTbbCandidateCollectionWrapper;
+    edm::Ptr<vallot::GenTTbbCandidate> dummyGenTTbbCandidatePtr;
+
+  };
+
+}
+
