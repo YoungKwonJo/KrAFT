@@ -3,6 +3,11 @@
 
 #include <vector>
 #include "TTree.h"
+#include "TMath.h"
+
+#include "Math/Vector3D.h"
+#include "Math/Vector4D.h"
+using namespace ROOT::Math;
 
 struct GenericEventTTBB
 {
@@ -26,6 +31,9 @@ public:
   typedef ints* intsP;
   typedef uints* uintsP;
   typedef doubles* doublesP;
+  typedef std::vector<ROOT::Math::XYZTVector> XYZTLorentzVectors;
+  typedef XYZTLorentzVectors* XYZTLorentzVectorsP;
+  //http://root.cern.ch/root/html/tutorials/math/mathcoreVectorCollection.C.html
 
   doublesP muons_pt_, muons_eta_, muons_phi_, muons_m_;
 
@@ -75,13 +83,23 @@ public:
   doublesP genParticles_pt_, genParticles_eta_, genParticles_phi_, genParticles_m_;
   intsP genParticles_pdgId_;
   intsP genParticles_mother_;
+  unsigned int flavorsIndex_, nb_, nc_;
+
+  XYZTLorentzVectorsP bJets_, cJets_;
+  intsP bIDs_, cIDs_;
+  intsP bpIDs_, cpIDs_;
+  doublesP bsDRs_, csDRs_;
+  intsP bprogenitor_pdgId_, cprogenitor_pdgId_;
+  doublesP bprogenitor_pt_, bprogenitor_eta_, bprogenitor_phi_;
+  doublesP cprogenitor_pt_, cprogenitor_eta_, cprogenitor_phi_;
+
 
   //ttbb candidate
   double genttbarM_;
   int nGenJet20_, nGenbJet20_, nGenaddbJet20_, nGencJet20_;
   int nGenJet40_, nGenbJet40_, nGenaddbJet40_, nGencJet40_;
   int ttbarGen_dileptonic_;
-  double genLep1_pt_, genLep2_pt_, genLep1_eta_, genLep2_eta_;
+  double genLep1_pt_, genLep2_pt_, genLep1_eta_, genLep2_eta_, genLep1_phi_, genLep2_phi_,;
 
 };
 

@@ -13,6 +13,7 @@ def initialise(runOnMC, decayMode, doOutModule=False, doPAT=True):
     process.MessageLogger.cerr.FwkReport.reportEvery = 10000
 
     process.source = cms.Source("PoolSource", fileNames = cms.untracked.vstring())
+    process.source.inputCommands = cms.untracked.vstring("keep *", "drop *_MEtoEDMConverter_*_*")
 
     process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
     from Configuration.AlCa.autoCond import autoCond
@@ -56,18 +57,23 @@ def initialise(runOnMC, decayMode, doOutModule=False, doPAT=True):
     if runOnMC: jecLevels = ['L1FastJet','L2Relative','L3Absolute']
     else: jecLevels = ['L1FastJet','L2Relative', 'L3Absolute', 'L2L3Residual']
 
+    postfix="PFlow"
     #usePFBRECO(process,runPFBRECO=True,
     usePF2PAT(process, runPF2PAT=True,
-              runOnMC=runOnMC, outputModules = outputModules, postfix="PFlow",
+              runOnMC=runOnMC, outputModules = outputModules, postfix=postfix,
               jetAlgo="AK5", jetCorrections=("AK5PFchs", jecLevels),
+              pvCollection=cms.InputTag('goodOfflinePrimaryVertices'),
               typeIMetCorrections=True)
+
+    #
+    process.pfPileUpPFlow.checkClosestZVertex = cms.bool(False)
 
     # top projections in PF2PAT:
     process.pfNoPileUpPFlow.enable = True
     process.pfNoMuonPFlow.enable = True
     process.pfNoElectronPFlow.enable = True
     process.pfNoTauPFlow.enable = False
-    process.pfNoJetPFlow.enable = True
+    process.pfNoJetPFlow.enable = False
 
     # verbose flags for the PF2PAT modules
     process.pfNoMuonPFlow.verbose = False
@@ -110,13 +116,30 @@ def initialise(runOnMC, decayMode, doOutModule=False, doPAT=True):
     process.patElectronsPFlow.isolationValues.pfChargedHadrons   = cms.InputTag('elPFIsoValueCharged03PFIdPFlow')
 
     ## Add common filters
-    process.load( "TopQuarkAnalysis.Configuration.patRefSel_goodVertex_cfi" )
-    process.goodOfflinePrimaryVertices.filter = True
+    process.primaryVertexFilter = cms.EDFilter("GoodVertexFilter",
+        vertexCollection = cms.InputTag('offlinePrimaryVertices'),
+        minimumNDOF = cms.uint32(4) ,
+        maxAbsZ = cms.double(24), 
+        maxd0 = cms.double(2) 
+    )
+
+    from PhysicsTools.SelectorUtils.pvSelector_cfi import pvSelector
+    process.goodOfflinePrimaryVertices = cms.EDFilter(
+        "PrimaryVertexObjectFilter",
+        filterParams = pvSelector.clone( maxZ = cms.double(24.0) ),
+        src=cms.InputTag('offlinePrimaryVertices')
+    )
+
+    #process.load( "TopQuarkAnalysis.Configuration.patRefSel_goodVertex_cfi" )
+    #process.goodOfflinePrimaryVertices.filter = True
 
     process.load( 'TopQuarkAnalysis.Configuration.patRefSel_eventCleaning_cff' )
     process.trackingFailureFilter.VertexSource = cms.InputTag('goodOfflinePrimaryVertices')
     if runOnMC: process.eventCleaning += process.eventCleaningMC
     else: process.eventCleaning += process.eventCleaningData
+
+    #reason : removing many events.
+    process.eventCleaning.remove(process.CSCTightHaloFilter)
 
     ## Lepton veto filters for L+J channels
     process.muonVetoFilter = cms.EDFilter("PATCandViewCountFilter",
@@ -140,56 +163,78 @@ def initialise(runOnMC, decayMode, doOutModule=False, doPAT=True):
     process.nEventsHLTMuJets = cms.EDProducer("EventCountProducer")
     process.nEventsHLTElJets = cms.EDProducer("EventCountProducer")
 
-    process.load("KrAFT.GeneratorTools.ttbar2bFilter_cfi")
-#    process.load( "RecoJets.Configuration.GenJetParticles_cff")
-#    process.load( "RecoJets.Configuration.RecoGenJets_cff")
 
-#    process.ReGenJetSequence = cms.Sequence(
-#        process.genParticlesForJets
-#      + process.genParticlesForJetsNoNu
-#      + process.ak5GenJets
-#      + process.ak5GenJetsNoNu
-#    )
+    ###############################
+    ### Add AK5GenJetsNoNu ####
+    ###############################
+    #process.load("RecoJets.Configuration.GenJetParticles_cff")
+    from RecoJets.Configuration.GenJetParticles_cff import genParticlesForJetsNoNu
+    from RecoJets.JetProducers.ak5GenJets_cfi import ak5GenJets
+    process.ak5GenJetsNoNu = ak5GenJets.clone( src = cms.InputTag("genParticlesForJetsNoNu") )
+
+    process.ak5GenJetsSeq = cms.Sequence(process.genParticlesForJets*process.genParticlesForJetsNoNu*process.ak5GenJetsNoNu)
+
+    # Flavor history stuff
+    process.load("PhysicsTools.HepMCCandAlgos.flavorHistoryPaths_cfi")
+    process.flavorHistoryFilter.pathToSelect = cms.int32(-1)
+    process.cFlavorHistoryProducer.matchedSrc = cms.InputTag("ak5GenJetsNoNu")
+    process.bFlavorHistoryProducer.matchedSrc = cms.InputTag("ak5GenJetsNoNu")
+    #ptMinParticle = cms.double(0.0)
+    #ptMinShower = cms.double(0.0)
+
+    #process.load( "RecoJets.Configuration.GenJetParticles_cff")
+    #process.load( "RecoJets.Configuration.RecoGenJets_cff")
+
+    #process.ReGenJetSequence = cms.Sequence(
+    #    process.genParticlesForJets
+    #  + process.genParticlesForJetsNoNu
+    #  + process.ak5GenJets
+    #  + process.ak5GenJetsNoNu
+    #)
 
     process.commonFilterSequence = cms.Sequence(
         process.goodOfflinePrimaryVertices
-      #* process.eventCleaning
-      + process.nEventsClean
+      * process.eventCleaning
+      * process.ak5GenJetsSeq
+      * process.primaryVertexFilter 
+      * process.nEventsClean
+      * getattr(process,"patPF2PATSequence"+postfix) # main PF2PAT 
+      * process.nEventsPAT
+      * process.flavorHistorySeq
     )
 
-    process.patSequenceComplete = cms.Sequence(
+#    process.patSequenceComplete = cms.Sequence(
     #  + process.patDefaultSequence
     #  + process.patPFBRECOSequencePFlow
-        process.patPF2PATSequencePFlow
-      + process.nEventsPAT
-    )
+#        process.patPF2PATSequencePFlow
+#      + process.nEventsPAT
+#    )
+
+    process.load("KrAFT.GeneratorTools.ttbar2bFilter_cfi")
 
     ## Defile paths
     if decayMode in ("all", "dilepton", "ElEl", "ee"):
         process.pElEl = cms.Path(
             process.nEventsTotal
-#          + process.ReGenJetSequence
-          + process.ttbar2bFilter
-          + process.commonFilterSequence
-          + process.hltElEl + process.nEventsHLTElEl
+          * process.commonFilterSequence
+          * process.ttbar2bFilter
+          * process.hltElEl * process.nEventsHLTElEl
         )
-        if doPAT: process.pElEl += process.patSequenceComplete
+#        if doPAT: process.pElEl += process.patSequenceComplete
     if decayMode in ("all", "dilepton", "MuMu", "mumu"):
         process.pMuMu = cms.Path(
             process.nEventsTotal
-#          + process.ReGenJetSequence
-          + process.commonFilterSequence
-          + process.hltMuMu + process.nEventsHLTMuMu
+          * process.commonFilterSequence
+          * process.hltMuMu * process.nEventsHLTMuMu
         )
-        if doPAT: process.pMuMu += process.patSequenceComplete
+#        if doPAT: process.pMuMu += process.patSequenceComplete
     if decayMode in ("all", "dilepton", "MuEl", "emu"):
         process.pMuEl = cms.Path(
             process.nEventsTotal
-#          + process.ReGenJetSequence
-          + process.commonFilterSequence
-          + process.hltMuEl + process.nEventsHLTMuEl
+          * process.commonFilterSequence
+          * process.hltMuEl * process.nEventsHLTMuEl
         )
-        if doPAT: process.pMuEl += process.patSequenceComplete
+#        if doPAT: process.pMuEl += process.patSequenceComplete
     if decayMode in ("all", "MuJets"):
         process.selectedPatMuonsPFlow.cut = 'isPFMuon && (isGlobalMuon || isTrackerMuon) && pt > 10 && abs(eta) < 2.5 && (chargedHadronIso + max(0.,neutralHadronIso+photonIso-0.5*puChargedHadronIso))/pt < 0.15'
         process.selectedPatElectronsPFlow.cut = 'pt > 20 && abs(eta) < 2.5 && electronID("mvaTrigV0") > 0. && (chargedHadronIso + max(0.,neutralHadronIso+photonIso-0.5*puChargedHadronIso))/pt < 0.15'
@@ -197,10 +242,10 @@ def initialise(runOnMC, decayMode, doOutModule=False, doPAT=True):
 
         process.pMuJets = cms.Path(
             process.nEventsTotal
-          + process.commonFilterSequence
-          + process.hltMuJets + process.nEventsHLTMuJets
+          * process.commonFilterSequence
+          * process.hltMuJets * process.nEventsHLTMuJets
         )
-        if doPAT: process.pMuJets += process.patSequenceComplete
+#        if doPAT: process.pMuJets += process.patSequenceComplete
         process.pMuJets *= process.muonVetoFilter
         process.pMuJets += process.electronVetoFilter
 
@@ -212,10 +257,10 @@ def initialise(runOnMC, decayMode, doOutModule=False, doPAT=True):
 
         process.pElJets = cms.Path(
             process.nEventsTotal
-          + process.commonFilterSequence
-          + process.hltElJets + process.nEventsHLTElJets
+          * process.commonFilterSequence
+          * process.hltElJets * process.nEventsHLTElJets
         )
-        if doPAT: process.pElJets += process.patSequenceComplete
+#        if doPAT: process.pElJets += process.patSequenceComplete
         process.pElJets *= process.muonVetoFilter
         process.pElJets += process.electronVetoFilter
 

@@ -73,6 +73,28 @@ GenericEventTTBB::GenericEventTTBB(bool isMC)
     genParticles_mother_ = new ints;
     genJets_decayFromBHadron_ = new ints;
     genJets_decayFromCHadron_ = new ints;
+
+    //matching genjet for b/c flavor
+    bJets_ = new XYZTLorentzVectors;
+    cJets_ = new XYZTLorentzVectors;
+    bIDs_ = new ints;
+    cIDs_ = new ints;
+
+    bpIDs_ = new ints;
+    cpIDs_ = new ints;
+    bsDRs_ = new doubles;
+    csDRs_ = new doubles;
+
+    bprogenitor_pdgId_ = new ints;
+    cprogenitor_pdgId_ = new ints;
+
+    bprogenitor_pt_ = new doubles;
+    bprogenitor_eta_ = new doubles;
+    bprogenitor_phi_ = new doubles;
+    cprogenitor_pt_ = new doubles;
+    cprogenitor_eta_ = new doubles;
+    cprogenitor_phi_ = new doubles;
+
   }
 }
 
@@ -176,6 +198,40 @@ void GenericEventTTBB::book(TTree* tree)
     tree_->Branch("genJets_decayFromBHadron"  , genJets_decayFromBHadron_  );
     tree_->Branch("genJets_decayFromCHadron"  , genJets_decayFromCHadron_  );
 
+    tree_->Branch("flavorsIndex"  , &flavorsIndex_,"flavorsIndex/i" );
+
+    tree_->Branch("nb"  , &nb_  ,"nb/i"  );
+    tree_->Branch("nc"  , &nc_  ,"nc/i"  );
+//    tree_->Branch("nbc"  , &nbc_  ,"nbc/i"  );
+//    tree_->Branch("ncb"  , &ncb_  ,"ncb/i"  );
+
+//    tree_->Branch("bIDs", &bIDs_,"bIDs/l");
+//    tree_->Branch("cIDs", &cIDs_,"cIDs/l");
+//    tree_->Branch("gnjet20bf", &gnjet20bf_,"gnjet20bf/I");
+
+    tree_->Branch("bJets" , "std::vector<ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<double> > >", &bJets_ );
+    tree_->Branch("cJets" , "std::vector<ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<double> > >", &cJets_ );
+//    tree_->Branch("bJets" ,  bJets_);
+//    tree_->Branch("cJets" ,  cJets_);
+    tree_->Branch("bIDs"  , bIDs_  );
+    tree_->Branch("cIDs"  , cIDs_  );
+
+    tree_->Branch("bpIDs"  , bpIDs_  );
+    tree_->Branch("cpIDs"  , cpIDs_  );
+    tree_->Branch("bsDRs"  , bsDRs_  );
+    tree_->Branch("csDRs"  , csDRs_  );
+
+    tree_->Branch("bprogenitor_pdgId"  , bprogenitor_pdgId_  );
+    tree_->Branch("cprogenitor_pdgId"  , cprogenitor_pdgId_  );
+
+    tree_->Branch("bprogenitor_pt"  , bprogenitor_pt_  );
+    tree_->Branch("bprogenitor_eta"  , bprogenitor_eta_  );
+    tree_->Branch("bprogenitor_phi"  , bprogenitor_phi_  );
+
+    tree_->Branch("cprogenitor_pt"  , cprogenitor_pt_  );
+    tree_->Branch("cprogenitor_eta"  , cprogenitor_eta_  );
+    tree_->Branch("cprogenitor_phi"  , cprogenitor_phi_  );
+
     tree_->Branch("genParticles_pt" , genParticles_pt_ );
     tree_->Branch("genParticles_eta", genParticles_eta_);
     tree_->Branch("genParticles_phi", genParticles_phi_);
@@ -197,6 +253,9 @@ void GenericEventTTBB::book(TTree* tree)
     tree_->Branch("genLep2_pt"      , &genLep2_pt_      , "genLep2_pt/D"  );
     tree_->Branch("genLep1_eta"      , &genLep1_eta_      , "genLep1_eta/D"  );
     tree_->Branch("genLep2_eta"      , &genLep2_eta_      , "genLep2_eta/D"  );
+    tree_->Branch("genLep1_phi"      , &genLep1_phi_      , "genLep1_phi/D"  );
+    tree_->Branch("genLep2_phi"      , &genLep2_phi_      , "genLep2_phi/D"  );
+
 
   }
 }
@@ -271,6 +330,27 @@ void GenericEventTTBB::clear()
     genParticles_m_  ->clear();
     genParticles_pdgId_->clear();
     genParticles_mother_->clear();
+
+    bJets_->clear();
+    cJets_->clear();
+    bIDs_->clear();
+    cIDs_->clear();
+
+    bpIDs_->clear();
+    cpIDs_->clear();
+    bsDRs_->clear();
+    csDRs_->clear();
+
+    bprogenitor_pdgId_->clear();
+    cprogenitor_pdgId_->clear();
+
+    bprogenitor_pt_->clear();
+    bprogenitor_eta_->clear();
+    bprogenitor_phi_->clear();
+
+    cprogenitor_pt_->clear();
+    cprogenitor_eta_->clear();
+    cprogenitor_phi_->clear();
   }
 }
 
@@ -374,6 +454,38 @@ void GenericEventTTBB::setBranch(TTree* tree)
     tree_->SetBranchAddress("genJets_decayFromBHadron", &genJets_decayFromBHadron_);
     tree_->SetBranchAddress("genJets_decayFromCHadron", &genJets_decayFromCHadron_);
 
+    tree_->SetBranchAddress("flavorsIndex", &flavorsIndex_);
+    tree_->SetBranchAddress("nb", &nb_);
+    tree_->SetBranchAddress("nc", &nc_);
+
+//    tree_->SetBranchAddress("nbc", &nbc_);
+//    tree_->SetBranchAddress("ncb", &ncb_);
+
+//    tree_->SetBranchAddress("bIDs", &bIDs_);
+//    tree_->SetBranchAddress("cIDs", &cIDs_);
+//    tree_->SetBranchAddress("gnjet20bf", &gnjet20bf_);
+
+    tree_->SetBranchAddress("bJets", &bJets_);
+    tree_->SetBranchAddress("cJets", &cJets_);
+    tree_->SetBranchAddress("bIDs" , &bIDs_ );
+    tree_->SetBranchAddress("cIDs" , &cIDs_ );
+
+    tree_->SetBranchAddress("bpIDs" , &bpIDs_ );
+    tree_->SetBranchAddress("cpIDs" , &cpIDs_ );
+    tree_->SetBranchAddress("bsDRs" , &bsDRs_ );
+    tree_->SetBranchAddress("csDRs" , &csDRs_ );
+
+    tree_->SetBranchAddress("bprogenitor_pdgId", &bprogenitor_pdgId_);
+    tree_->SetBranchAddress("cprogenitor_pdgId", &cprogenitor_pdgId_);
+
+    tree_->SetBranchAddress("bprogenitor_pt", &bprogenitor_pt_);
+    tree_->SetBranchAddress("bprogenitor_eta", &bprogenitor_eta_);
+    tree_->SetBranchAddress("bprogenitor_phi", &bprogenitor_phi_);
+
+    tree_->SetBranchAddress("cprogenitor_pt", &cprogenitor_pt_);
+    tree_->SetBranchAddress("cprogenitor_eta", &cprogenitor_eta_);
+    tree_->SetBranchAddress("cprogenitor_phi", &cprogenitor_phi_);
+
     tree_->SetBranchAddress("genParticles_pt" , &genParticles_pt_ );
     tree_->SetBranchAddress("genParticles_eta", &genParticles_eta_);
     tree_->SetBranchAddress("genParticles_phi", &genParticles_phi_);
@@ -395,6 +507,9 @@ void GenericEventTTBB::setBranch(TTree* tree)
     tree_->SetBranchAddress("genLep2_pt"     , &genLep2_pt_  );
     tree_->SetBranchAddress("genLep1_eta"     , &genLep1_eta_  );
     tree_->SetBranchAddress("genLep2_eta"     , &genLep2_eta_  );
+    tree_->SetBranchAddress("genLep1_phi"     , &genLep1_phi_  );
+    tree_->SetBranchAddress("genLep2_phi"     , &genLep2_phi_  );
+ 
   }
 }
 
@@ -469,5 +584,26 @@ GenericEventTTBB::~GenericEventTTBB()
     delete genParticles_m_  ;
     delete genParticles_pdgId_ ;
     delete genParticles_mother_;
+
+    delete bJets_;
+    delete cJets_;
+    delete bIDs_;
+    delete cIDs_;
+
+    delete bpIDs_;
+    delete cpIDs_;
+    delete bsDRs_;
+    delete csDRs_;
+
+    delete bprogenitor_pdgId_;
+    delete cprogenitor_pdgId_;
+
+    delete bprogenitor_pt_;
+    delete bprogenitor_eta_;
+    delete bprogenitor_phi_;
+
+    delete cprogenitor_pt_;
+    delete cprogenitor_eta_;
+    delete cprogenitor_phi_;
   }
 }

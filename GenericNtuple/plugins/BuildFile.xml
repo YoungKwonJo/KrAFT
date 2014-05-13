@@ -11,6 +11,7 @@
 <use name="PhysicsTools/RecoUtils" />
 <use name="PhysicsTools/JetMCUtils" />
 <use name="RecoVertex/VertexTools" />
+<use name="DataFormats/HepMCCandidate" />
 
 <use name="KrAFT/GenericNtuple" />
 

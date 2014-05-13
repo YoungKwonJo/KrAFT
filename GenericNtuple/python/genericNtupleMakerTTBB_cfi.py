@@ -5,9 +5,15 @@ event = cms.EDAnalyzer("KGenericNtupleMakerTTBB",
 
     genEventInfo = cms.InputTag("generator"),
     genParticle = cms.InputTag("genParticles"),
-    genJet = cms.InputTag("ak5GenJets"),
+#    genParticle = cms.InputTag("genParticlesForJetsNoNu"),
+    genJet = cms.InputTag('ak5GenJetsNoNu'),
+#    genJet = cms.InputTag("ak5GenJets"),
     recoToGenJetMap = cms.InputTag("recoToGenJetMap"),
     genJetToPartonsMap = cms.InputTag("genJetToPartonsMap"),
+
+    flavorHistoryFilter = cms.InputTag("flavorHistoryFilter"),
+    bFlavorHistoryProducer = cms.InputTag("bFlavorHistoryProducer", "bPartonFlavorHistory"),
+    cFlavorHistoryProducer = cms.InputTag("cFlavorHistoryProducer", "cPartonFlavorHistory"),
 
     pdfWeights = cms.InputTag("pdfWeight"),
     puWeight = cms.InputTag("pileupWeight"),

@@ -26,6 +26,11 @@
 #include "DataFormats/Math/interface/deltaR.h"
 #include "PhysicsTools/JetMCUtils/interface/JetMCTag.h"
 
+#include "DataFormats/HepMCCandidate/interface/FlavorHistoryEvent.h"
+#include "DataFormats/Candidate/interface/ShallowClonePtrCandidate.h"
+#include "DataFormats/Candidate/interface/Candidate.h"
+#include "DataFormats/Candidate/interface/CandidateFwd.h"
+
 #include "KrAFT/GeneratorTools/interface/GenTTbbCandidate.h"
 #include "KrAFT/GenericNtuple/interface/GenericEventTTBB.h"
 #include "KrAFT/RecoSelectorTools/interface/Types.h"
@@ -36,6 +41,7 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include "TLorentzVector.h"
 
 using namespace std;
 
@@ -63,6 +69,11 @@ private:
   // Input objects
   edm::InputTag genEventInfoLabel_;
   edm::InputTag genParticleLabel_;
+
+  edm::InputTag flavorHistoryFilterLabel_;
+  edm::InputTag bFlavorHistoryLabel_;
+  edm::InputTag cFlavorHistoryLabel_;
+
   edm::InputTag genJetLabel_;
   edm::InputTag puWeightLabel_;
   edm::InputTag vertexLabel_;
@@ -131,6 +142,9 @@ KGenericNtupleMakerTTBB::KGenericNtupleMakerTTBB(const edm::ParameterSet& pset)
     pdfWeightsLabel_ = pset.getParameter<edm::InputTag>("pdfWeights");
     genParticleLabel_ = pset.getParameter<edm::InputTag>("genParticle");
     genJetLabel_ = pset.getParameter<edm::InputTag>("genJet");
+    flavorHistoryFilterLabel_ = pset.getParameter<edm::InputTag>("flavorHistoryFilter");
+    bFlavorHistoryLabel_= pset.getParameter<edm::InputTag>("bFlavorHistoryProducer");
+    cFlavorHistoryLabel_= pset.getParameter<edm::InputTag>("cFlavorHistoryProducer");
   }
 
   // Output histograms and tree
@@ -308,6 +322,123 @@ void KGenericNtupleMakerTTBB::analyze(const edm::Event& event, const edm::EventS
 
   if ( isMC_ )
   {
+    edm::Handle<reco::FlavorHistoryEvent > bFlavorHistoryEvent;
+    event.getByLabel(bFlavorHistoryLabel_,bFlavorHistoryEvent);
+
+    edm::Handle<reco::FlavorHistoryEvent > cFlavorHistoryEvent;
+    event.getByLabel(cFlavorHistoryLabel_,cFlavorHistoryEvent);
+
+    //https://github.com/cms-sw/cmssw/blob/CMSSW_7_1_X/DataFormats/HepMCCandidate/interface/FlavorHistoryEvent.h
+    //https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideFlavorHistory
+//    unsigned long BFIDs=0, CFIDs=0;
+//    int njet20bf=0;
+    if(bFlavorHistoryEvent.isValid())
+    {
+       for (reco::FlavorHistoryEvent::const_iterator it = bFlavorHistoryEvent->begin() ; it != bFlavorHistoryEvent->end(); ++it)
+       {
+             int bid=0;
+             const reco::FlavorHistory& it1 = *it;
+             const reco::ShallowClonePtrCandidate& mjet = it1.matchedJet();
+             const reco::CandidatePtr parton = it1.parton();
+             const reco::CandidatePtr progenitor = it1.progenitor();
+             int pdgId = -100, progenitor_pdgId=-100;
+             double progenitor_pt=-100, progenitor_eta=-1000, progenitor_phi=-100;
+             if ( parton.isNonnull() ) pdgId = parton->pdgId();
+             if ( progenitor.isNonnull() )
+             {
+                progenitor_pdgId = progenitor->pdgId(); 
+                progenitor_pt=progenitor->pt(); progenitor_eta=progenitor->eta(); progenitor_phi=progenitor->phi(); 
+             }
+
+             ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<double> > bjet_;
+             if ( mjet.masterClonePtr().isNonnull() ) bjet_.SetPxPyPzE(mjet.px(), mjet.py(), mjet.pz(), mjet.energy());
+             else continue;
+
+             if(it1.flavorSource() == reco::FlavorHistory::FLAVOR_NULL   )  bid=1;  // No flavor, unset
+             if(it1.flavorSource() == reco::FlavorHistory::FLAVOR_GS     )  bid=2;  // gluon splitting
+             if(it1.flavorSource() == reco::FlavorHistory::FLAVOR_EXC    )  bid=3;  // flavor excitation
+             if(it1.flavorSource() == reco::FlavorHistory::FLAVOR_ME     )  bid=4;  // matrix element
+             if(it1.flavorSource() == reco::FlavorHistory::FLAVOR_DECAY  )  bid=5;  // flavor decay
+             if(it1.flavorSource() == reco::FlavorHistory::N_FLAVOR_TYPES)  bid=6;  // total number
+
+             const reco::ShallowClonePtrCandidate& sJet = it1.sisterJet();
+             TLorentzVector p41 ( mjet.px(), mjet.py(), mjet.pz(), mjet.energy());
+             TLorentzVector p42 ( sJet.px(), sJet.py(), sJet.pz(), sJet.energy());
+
+             double dR = -1;
+             if ( sJet.masterClonePtr().isNonnull() ) {
+                dR = p41.DeltaR( p42 );
+             }
+ 
+             fevent_->bJets_->push_back(bjet_);
+             fevent_->bIDs_->push_back(bid);
+             fevent_->bpIDs_->push_back(pdgId);
+             fevent_->bsDRs_->push_back(dR);
+             fevent_->bprogenitor_pdgId_->push_back(progenitor_pdgId);
+             fevent_->bprogenitor_pt_->push_back(progenitor_pt);
+             fevent_->bprogenitor_eta_->push_back(progenitor_eta);
+             fevent_->bprogenitor_phi_->push_back(progenitor_phi);
+       }
+       fevent_->nb_=bFlavorHistoryEvent->nb(); // unsigned int
+    } 
+    if(cFlavorHistoryEvent.isValid())
+    {
+        for (reco::FlavorHistoryEvent::const_iterator it = cFlavorHistoryEvent->begin() ; it != cFlavorHistoryEvent->end(); ++it)
+        {
+             int cid=0;
+             const reco::FlavorHistory& it1 = *it;
+             const reco::ShallowClonePtrCandidate& mjet = it1.matchedJet();
+             const reco::CandidatePtr parton = it1.parton();
+             const reco::CandidatePtr progenitor = it1.progenitor();
+             int pdgId = -100, progenitor_pdgId=-100;
+             double progenitor_pt=-100, progenitor_eta=-1000, progenitor_phi=-100;
+             if ( parton.isNonnull() ) pdgId = parton->pdgId();
+             if ( progenitor.isNonnull() )
+             {
+                 progenitor_pdgId = progenitor->pdgId();
+                 progenitor_pt=progenitor->pt(); progenitor_eta=progenitor->eta(); progenitor_phi=progenitor->phi();
+             }
+
+             ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<double> > cjet_;
+             if ( mjet.masterClonePtr().isNonnull() ) cjet_.SetPxPyPzE(mjet.px(), mjet.py(), mjet.pz(), mjet.energy());
+             else continue;
+
+             if(it1.flavorSource() == reco::FlavorHistory::FLAVOR_NULL   )  cid=1;  // No flavor, unset
+             if(it1.flavorSource() == reco::FlavorHistory::FLAVOR_GS     )  cid=2;  // gluon splitting
+             if(it1.flavorSource() == reco::FlavorHistory::FLAVOR_EXC    )  cid=3;  // flavor excitation
+             if(it1.flavorSource() == reco::FlavorHistory::FLAVOR_ME     )  cid=4;  // matrix element
+             if(it1.flavorSource() == reco::FlavorHistory::FLAVOR_DECAY  )  cid=5;  // flavor decay
+             if(it1.flavorSource() == reco::FlavorHistory::N_FLAVOR_TYPES)  cid=6;  // total number
+
+              const reco::ShallowClonePtrCandidate& sJet = it1.sisterJet();
+              TLorentzVector p41 ( mjet.px(), mjet.py(), mjet.pz(), mjet.energy());
+              TLorentzVector p42 ( sJet.px(), sJet.py(), sJet.pz(), sJet.energy());
+
+              double dR = -1;  
+              if ( sJet.masterClonePtr().isNonnull() ) {
+                dR = p41.DeltaR( p42 );
+              }
+ 
+             fevent_->cJets_->push_back(cjet_);
+             fevent_->cIDs_->push_back(cid);
+             fevent_->cpIDs_->push_back(pdgId);
+             fevent_->csDRs_->push_back(dR);
+             fevent_->cprogenitor_pdgId_->push_back(progenitor_pdgId);
+             fevent_->cprogenitor_pt_->push_back(progenitor_pt);
+             fevent_->cprogenitor_eta_->push_back(progenitor_eta);
+             fevent_->cprogenitor_phi_->push_back(progenitor_phi);
+        }
+        fevent_->nc_=cFlavorHistoryEvent->nc(); // unsigned int
+    }
+ 
+    //unsigned int   "flavorHistoryFilter" ""  "KrAFT"
+    edm::Handle<unsigned int> flavorsIndexHandle;
+    event.getByLabel(flavorHistoryFilterLabel_, flavorsIndexHandle);
+    const unsigned int flavorsIndex = *(flavorsIndexHandle.product());
+    //https://github.com/cms-sw/cmssw/blob/CMSSW_7_1_X/PhysicsTools/HepMCCandAlgos/plugins/FlavorHistoryFilter.cc
+    //https://github.com/cms-sw/cmssw/blob/CMSSW_7_1_X/PhysicsTools/HepMCCandAlgos/python/flavorHistoryFilter_cfi.py
+    fevent_->flavorsIndex_ = flavorsIndex;
+
     // Event weight and PDF stuffs
     edm::Handle<GenEventInfoProduct> genEventInfoHandle;
     event.getByLabel(genEventInfoLabel_, genEventInfoHandle);
@@ -414,6 +545,8 @@ void KGenericNtupleMakerTTBB::analyze(const edm::Event& event, const edm::EventS
       fevent_->genLep2_pt_ = ttbarGenLevel.lepton2().pt();
       fevent_->genLep1_eta_ = ttbarGenLevel.lepton1().eta();
       fevent_->genLep2_eta_ = ttbarGenLevel.lepton2().eta();
+      fevent_->genLep1_phi_ = ttbarGenLevel.lepton1().phi();
+      fevent_->genLep2_phi_ = ttbarGenLevel.lepton2().phi();
       fevent_->ttbarGen_dileptonic_ = ttbarGenLevel.diLeptonic();
     }
   }
